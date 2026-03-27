@@ -31,6 +31,15 @@ def load_b2b_data():
 # --- BILLEDE & DATA FREMVISER (POP-UP) ---
 @st.dialog("📸 Se billeder & detaljer", width="large")
 def show_car_details(row):
+    
+    # Status Mærkat i Pop-up
+    status_dk = str(row.get('Status', '')).strip()
+    if status_dk and status_dk != 'nan':
+        if "vej" in status_dk.lower():
+            st.markdown(f"**Status:** ⏳ {status_dk}")
+        else:
+            st.markdown(f"**Status:** 🟢 {status_dk}")
+            
     st.markdown(f"## {row.get('Mærke', '')} {row.get('Model', '')}")
     st.markdown(f"#### {row.get('Variant', '')}")
     st.write("")
@@ -114,22 +123,24 @@ df_b2b = load_b2b_data()
 
 if df_b2b is not None and not df_b2b.empty:
     # 1. VIS KUN AKTIVE BILER
-    if 'Status' in df_b2b.columns:
-        df_b2b = df_b2b[df_b2b['Status'].astype(str).str.strip().str.lower() == 'aktiv']
+    if 'Status.1' in df_b2b.columns:
+        df_b2b = df_b2b[df_b2b['Status.1'].astype(str).str.strip().str.lower() == 'aktiv']
+    elif 'Status' in df_b2b.columns and df_b2b.columns.to_list().count('Status') == 1:
+         df_b2b = df_b2b[df_b2b['Status'].astype(str).str.strip().str.lower() == 'aktiv']
     
-    # 2. VIS KUN ELBILER (Det magiske filter)
+    # 2. VIS KUN ELBILER
     if 'Drivmiddel' in df_b2b.columns:
         df_b2b = df_b2b[df_b2b['Drivmiddel'].astype(str).str.contains('Elektrisk|El', case=False, na=False)]
     
     if df_b2b.empty:
         st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
     else:
-        # FORBERED DATA TIL SORTERING (Kigger nu på DKK prisen)
+        # FORBERED DATA TIL SORTERING
         df_b2b['Sort_Price'] = pd.to_numeric(df_b2b['Pris DKK'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         df_b2b['Sort_Year'] = pd.to_numeric(df_b2b['Årgang'].astype(str).str[:4], errors='coerce').fillna(0)
         df_b2b['Sort_Km'] = pd.to_numeric(df_b2b['Odometer'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(9999999)
 
-        # TOP MENU: SØGNING OG FILTRERING (DANSK)
+        # TOP MENU
         c_search, c_moms, c_afgift, c_sort = st.columns(4)
         
         search_q = c_search.text_input("🔍 Søg mærke/model")
@@ -170,6 +181,20 @@ if df_b2b is not None and not df_b2b.empty:
             for col, (_, row) in zip(cols, chunk.iterrows()):
                 with col:
                     with st.container(border=True):
+                        
+                        # Tjekker kolonnenavnet for Status (Da Pandas tilføjer .1 ved dobbelte navne)
+                        status_col = 'Status' if 'Status' in row and not pd.isna(row['Status']) and row['Status'] != 'Aktiv' else ('Status.1' if 'Status.1' in row else '')
+                        
+                        # --- STATUS MÆRKAT I TOPPEN AF KORTET ---
+                        status_dk = str(row.get('Status', '')).strip()
+                        if status_dk and status_dk != 'nan' and status_dk != 'Aktiv':
+                            if "vej" in status_dk.lower():
+                                st.markdown(f"<div style='background-color:#fff3cd; color:#856404; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:bold; width: fit-content; margin-bottom: 5px;'>⏳ {status_dk}</div>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"<div style='background-color:#d4edda; color:#155724; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:bold; width: fit-content; margin-bottom: 5px;'>🟢 {status_dk}</div>", unsafe_allow_html=True)
+
+                        
+                        # Billede
                         img_string = str(row.get('Billede URL', ''))
                         first_img = img_string.split(',')[0].strip() if img_string and img_string != 'nan' else ''
                         if pd.notna(first_img) and first_img.startswith('http'): 
