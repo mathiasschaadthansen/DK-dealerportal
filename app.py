@@ -32,22 +32,45 @@ with st.sidebar:
     if not st.session_state['cart']:
         st.info("Klik på '➕ Tilføj til pakke' under bilerne for at samle et parti og give et samlet bud.")
     else:
-        total_price = 0
+        total_list_price = 0
+        total_bid_price = 0
         cart_text_lines = []
         
-        st.write("Valgte biler:")
+        st.write("**Dine bud pr. bil:**")
         for key, car in st.session_state['cart'].items():
-            st.markdown(f"- **{car['title']}** ({car['price_str']})")
-            total_price += car['price_int']
-            cart_text_lines.append(f"- {car['title']} (VIN: {car['vin']})")
+            total_list_price += car['price_int']
+            
+            # Hent nuværende bud (eller listepris som standard)
+            current_bid = car.get('bid_price', car['price_int'])
+            
+            # Input-felt til forhandlerens eget bud
+            listepris_str = f"kr. {car['price_int']:,}".replace(',', '.')
+            new_bid = st.number_input(
+                f"{car['title']} (Listepris: {listepris_str})",
+                min_value=0,
+                value=int(current_bid),
+                step=1000,
+                key=f"bid_{key}"
+            )
+            
+            # Opdater kurven med det nye bud
+            st.session_state['cart'][key]['bid_price'] = new_bid
+            total_bid_price += new_bid
+            
+            # Formater bud til teksten
+            bid_str = f"kr. {new_bid:,}".replace(',', '.')
+            cart_text_lines.append(f"- {car['title']} (VIN: {car['vin']}) -> Mit bud: {bid_str}")
             
         st.write("---")
-        st.write("**Samlet listepris:**")
-        st.markdown(f"<h3 style='color: #2e7b32; margin-top:-10px;'>kr. {total_price:,}</h3>".replace(',', '.'), unsafe_allow_html=True)
+        st.write(f"**Samlet listepris:** kr. {total_list_price:,}".replace(',', '.'))
+        st.write("**Dit samlede bud:**")
+        st.markdown(f"<h3 style='color: #2e7b32; margin-top:-10px;'>kr. {total_bid_price:,}</h3>".replace(',', '.'), unsafe_allow_html=True)
         
         st.write("---")
         cars_str = "\n".join(cart_text_lines)
-        mail_body = f"Hej Mathias og Brian,\n\nJeg vil gerne give et samlet bud på kr. [Indtast dit bud her] for følgende {len(st.session_state['cart'])} biler i en pakkehandel:\n\n{cars_str}\n\nVenlig hilsen,"
+        total_bid_str = f"kr. {total_bid_price:,}".replace(',', '.')
+        
+        mail_body = f"Hej Mathias og Brian,\n\nJeg vil gerne give følgende bud på {len(st.session_state['cart'])} biler i en pakkehandel:\n\n{cars_str}\n\nSamlet bud: {total_bid_str}\n\nVenlig hilsen,"
         
         mail_link = f"mailto:matsc@maulbiler.dk,brmau@maulbiler.dk?subject=Samlet bud på {len(st.session_state['cart'])} biler&body={urllib.parse.quote(mail_body)}"
         wa_link = f"https://wa.me/{WHATSAPP_NUMBER}?text={urllib.parse.quote(mail_body)}"
@@ -283,9 +306,10 @@ if df_b2b is not None and not df_b2b.empty:
                             if st.button("➕ Tilføj til pakke", key=f"add_{row.name}", use_container_width=True):
                                 st.session_state['cart'][vin_key] = {
                                     'title': mærke_model,
-                                    'price_int': pris_int,
+                                    'price_int': int(pris_int), # Sikrer at den er integer til udregning
                                     'price_str': pris_display,
-                                    'vin': vin
+                                    'vin': vin,
+                                    'bid_price': int(pris_int) # Standardbuddet er listeprisen
                                 }
                                 st.rerun()
 
