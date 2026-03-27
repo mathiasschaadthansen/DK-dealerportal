@@ -13,11 +13,6 @@ hide_st_style = """
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# ==========================================
-# ⚙️ INDSTILLINGER (WHATSAPP NUMMER)
-# ==========================================
-WHATSAPP_NUMBER = "4561438202" 
-
 st.title("⚡ Maul Biler - B2B Elbiler")
 st.write("Velkommen til vores danske B2B portal. Her finder du vores aktuelle elbiler klar til handel.")
 
@@ -34,7 +29,7 @@ def show_car_details(row):
     
     # Status Mærkat i Pop-up
     status_dk = str(row.get('Status', '')).strip()
-    if status_dk and status_dk != 'nan':
+    if status_dk and status_dk != 'nan' and status_dk != 'Aktiv':
         if "vej" in status_dk.lower():
             st.markdown(f"**Status:** ⏳ {status_dk}")
         else:
@@ -103,34 +98,36 @@ def show_car_details(row):
     mærke_model = f"{row.get('Mærke', '')} {row.get('Model', '')}"
     
     modtagere = "matsc@maulbiler.dk,brmau@maulbiler.dk"
-    emne = urllib.parse.quote(f"Køb af {mærke_model} (VIN: {vin})")
-    tekst = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne købe bilen med stelnummer: {vin}")
-    mail_link = f"mailto:{modtagere}?subject={emne}&body={tekst}"
     
-    wa_text = urllib.parse.quote(f"Hej! Jeg vil gerne købe bilen med stelnummer: {vin}")
-    wa_link = f"https://wa.me/{WHATSAPP_NUMBER}?text={wa_text}"
+    # Mail: KØB
+    emne_koeb = urllib.parse.quote(f"Køb af {mærke_model} (VIN: {vin})")
+    tekst_koeb = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne købe bilen til den annoncerede pris.\n\nStelnummer: {vin}")
+    mail_link_koeb = f"mailto:{modtagere}?subject={emne_koeb}&body={tekst_koeb}"
     
-    btn_col1, btn_col2, btn_col3 = st.columns(3)
+    # Mail: BYD
+    emne_byd = urllib.parse.quote(f"Bud på {mærke_model} (VIN: {vin})")
+    tekst_byd = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne give et bud på bilen.\n\nMit bud er: [Indtast dit bud her] kr.\n\nStelnummer: {vin}")
+    mail_link_byd = f"mailto:{modtagere}?subject={emne_byd}&body={tekst_byd}"
     
-    btn_col1.markdown(f"<a href='{mail_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 10px; cursor: pointer; font-size: 15px; font-weight: bold;'>✉️ Send e-mail</button></a>", unsafe_allow_html=True)
-    btn_col2.markdown(f"<a href='{wa_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #25D366; color: white; border: none; padding: 10px; cursor: pointer; font-size: 15px; font-weight: bold; color: white;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
+    btn_col1, btn_col2 = st.columns(2)
     
-    if btn_col3.button("🖨️ Print / PDF", use_container_width=True):
-        st.info("⌨️ Tip: Tryk **CTRL + P** (eller **CMD + P** på Mac) for at gemme som PDF eller printe siden.")
+    btn_col1.markdown(f"<a href='{mail_link_koeb}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 12px; cursor: pointer; font-size: 16px; font-weight: bold;'>🛒 Køb</button></a>", unsafe_allow_html=True)
+    btn_col2.markdown(f"<a href='{mail_link_byd}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #555555; color: white; border: none; padding: 12px; cursor: pointer; font-size: 16px; font-weight: bold;'>⚖️ Byd</button></a>", unsafe_allow_html=True)
 
 # --- HOVEDPROGRAM ---
 df_b2b = load_b2b_data()
 
 if df_b2b is not None and not df_b2b.empty:
-    # 1. VIS KUN AKTIVE BILER
-    if 'Status.1' in df_b2b.columns:
-        df_b2b = df_b2b[df_b2b['Status.1'].astype(str).str.strip().str.lower() == 'aktiv']
-    elif 'Status' in df_b2b.columns and df_b2b.columns.to_list().count('Status') == 1:
-         df_b2b = df_b2b[df_b2b['Status'].astype(str).str.strip().str.lower() == 'aktiv']
     
-    # 2. VIS KUN ELBILER
+    # 1. VIS KUN AKTIVE BILER (Leder efter kolonnen længst til højre, uanset om Pandas kalder den Status.1)
+    status_cols = [c for c in df_b2b.columns if 'Status' in c]
+    if status_cols:
+        active_col = status_cols[-1] # Tager den allersidste status kolonne i regnearket
+        df_b2b = df_b2b[df_b2b[active_col].astype(str).str.strip().str.lower() == 'aktiv']
+    
+    # 2. VIS KUN ELBILER (Rettet: Strengt match for at undgå at 'Diesel' bliver fanget)
     if 'Drivmiddel' in df_b2b.columns:
-        df_b2b = df_b2b[df_b2b['Drivmiddel'].astype(str).str.contains('Elektrisk|El', case=False, na=False)]
+        df_b2b = df_b2b[df_b2b['Drivmiddel'].astype(str).str.strip().str.lower().isin(['elektrisk', 'el', 'elbil', 'elbiler'])]
     
     if df_b2b.empty:
         st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
@@ -182,9 +179,6 @@ if df_b2b is not None and not df_b2b.empty:
                 with col:
                     with st.container(border=True):
                         
-                        # Tjekker kolonnenavnet for Status (Da Pandas tilføjer .1 ved dobbelte navne)
-                        status_col = 'Status' if 'Status' in row and not pd.isna(row['Status']) and row['Status'] != 'Aktiv' else ('Status.1' if 'Status.1' in row else '')
-                        
                         # --- STATUS MÆRKAT I TOPPEN AF KORTET ---
                         status_dk = str(row.get('Status', '')).strip()
                         if status_dk and status_dk != 'nan' and status_dk != 'Aktiv':
@@ -192,7 +186,6 @@ if df_b2b is not None and not df_b2b.empty:
                                 st.markdown(f"<div style='background-color:#fff3cd; color:#856404; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:bold; width: fit-content; margin-bottom: 5px;'>⏳ {status_dk}</div>", unsafe_allow_html=True)
                             else:
                                 st.markdown(f"<div style='background-color:#d4edda; color:#155724; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:bold; width: fit-content; margin-bottom: 5px;'>🟢 {status_dk}</div>", unsafe_allow_html=True)
-
                         
                         # Billede
                         img_string = str(row.get('Billede URL', ''))
@@ -214,34 +207,33 @@ if df_b2b is not None and not df_b2b.empty:
                         st.markdown(f"📅 **{aarstal}** &nbsp; | &nbsp; 🛣️ **{km_str}** <br> 🕹️ **{gear}** &nbsp; | &nbsp; ⚡ **{fuel}**", unsafe_allow_html=True)
                         st.markdown(f"🏷️ {row.get('Moms status', '-')} &nbsp; | &nbsp; ⚖️ {row.get('Afgift status', '-')}")
                         
-                        # Viser DKK pris!
+                        # VISER DKK PRIS MED RETTET LAYOUT
                         pris_int = row.get('Sort_Price', 0)
                         st.write("---")
                         if pris_int > 0: 
-                            st.markdown(f"<h2 style='text-align: center; color: #2e7b32;'>kr. {int(pris_int):,}</h2>".replace(',', '.'), unsafe_allow_html=True)
+                            st.markdown(f"<h2 style='text-align: center; color: #2e7b32; font-weight: bold;'>kr. {int(pris_int):,}</h2>".replace(',', '.'), unsafe_allow_html=True)
                         else: 
                             st.markdown(f"<h2 style='text-align: center;'>Giv et bud</h2>", unsafe_allow_html=True)
                         
                         if st.button("📸 Se detaljer & billeder", key=f"view_{row.name}", use_container_width=True): 
                             show_car_details(row)
                         
-                        # KNAPPER PÅ KORTET (DANSK)
+                        # KNAPPER PÅ KORTET (KØB & BYD)
                         vin = str(row.get('Stelnummer', 'Ukendt'))
                         mærke_model = f"{row.get('Mærke', '')} {row.get('Model', '')}"
-                        
                         modtagere = "matsc@maulbiler.dk,brmau@maulbiler.dk"
-                        emne = urllib.parse.quote(f"Køb af {mærke_model} (VIN: {vin})")
-                        tekst = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne købe bilen med stelnummer: {vin}")
-                        mail_link = f"mailto:{modtagere}?subject={emne}&body={tekst}"
                         
-                        wa_text = urllib.parse.quote(f"Hej! Jeg vil gerne købe bilen med stelnummer: {vin}")
-                        wa_link = f"https://wa.me/{WHATSAPP_NUMBER}?text={wa_text}"
+                        emne_koeb = urllib.parse.quote(f"Køb af {mærke_model} (VIN: {vin})")
+                        tekst_koeb = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne købe bilen til den annoncerede pris.\n\nStelnummer: {vin}")
+                        mail_link_koeb = f"mailto:{modtagere}?subject={emne_koeb}&body={tekst_koeb}"
                         
-                        c_btn1, c_btn2, c_btn3 = st.columns(3)
-                        c_btn1.markdown(f"<a href='{mail_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 6px; cursor: pointer; font-size: 12px; font-weight: bold;'>✉️ Mail</button></a>", unsafe_allow_html=True)
-                        c_btn2.markdown(f"<a href='{wa_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #25D366; color: white; border: none; padding: 6px; cursor: pointer; font-size: 12px; font-weight: bold; color: white;'>💬 WA</button></a>", unsafe_allow_html=True)
+                        emne_byd = urllib.parse.quote(f"Bud på {mærke_model} (VIN: {vin})")
+                        tekst_byd = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne give et bud på bilen.\n\nMit bud er: [Indtast dit bud her] kr.\n\nStelnummer: {vin}")
+                        mail_link_byd = f"mailto:{modtagere}?subject={emne_byd}&body={tekst_byd}"
                         
-                        if c_btn3.button("🖨️ Print", key=f"print_{row.name}", use_container_width=True):
-                            st.info("⌨️ **CTRL + P** (eller **CMD + P**)")
+                        c_btn1, c_btn2 = st.columns(2)
+                        c_btn1.markdown(f"<a href='{mail_link_koeb}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 6px; cursor: pointer; font-size: 14px; font-weight: bold;'>🛒 Køb</button></a>", unsafe_allow_html=True)
+                        c_btn2.markdown(f"<a href='{mail_link_byd}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #555555; color: white; border: none; padding: 6px; cursor: pointer; font-size: 14px; font-weight: bold;'>⚖️ Byd</button></a>", unsafe_allow_html=True)
+
 else:
     st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
