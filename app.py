@@ -18,6 +18,47 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 # ==========================================
 WHATSAPP_NUMBER = "4561438202" 
 
+# ==========================================
+# 🛒 SESSION STATE (PAKKEKØB / KURV)
+# ==========================================
+if 'cart' not in st.session_state:
+    st.session_state['cart'] = {}
+
+# ==========================================
+# 📦 SIDEMENU (DIN PAKKE)
+# ==========================================
+with st.sidebar:
+    st.header("📦 Din Pakke (Pakkekøb)")
+    if not st.session_state['cart']:
+        st.info("Klik på '➕ Tilføj til pakke' under bilerne for at samle et parti og give et samlet bud.")
+    else:
+        total_price = 0
+        cart_text_lines = []
+        
+        st.write("Valgte biler:")
+        for key, car in st.session_state['cart'].items():
+            st.markdown(f"- **{car['title']}** ({car['price_str']})")
+            total_price += car['price_int']
+            cart_text_lines.append(f"- {car['title']} (VIN: {car['vin']})")
+            
+        st.write("---")
+        st.write("**Samlet listepris:**")
+        st.markdown(f"<h3 style='color: #2e7b32; margin-top:-10px;'>kr. {total_price:,}</h3>".replace(',', '.'), unsafe_allow_html=True)
+        
+        st.write("---")
+        cars_str = "\n".join(cart_text_lines)
+        mail_body = f"Hej Mathias og Brian,\n\nJeg vil gerne give et samlet bud på kr. [Indtast dit bud her] for følgende {len(st.session_state['cart'])} biler i en pakkehandel:\n\n{cars_str}\n\nVenlig hilsen,"
+        
+        mail_link = f"mailto:matsc@maulbiler.dk,brmau@maulbiler.dk?subject=Samlet bud på {len(st.session_state['cart'])} biler&body={urllib.parse.quote(mail_body)}"
+        wa_link = f"https://wa.me/{WHATSAPP_NUMBER}?text={urllib.parse.quote(mail_body)}"
+        
+        st.markdown(f"<a href='{mail_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 10px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 8px;'>✉️ Send samlet bud (Mail)</button></a>", unsafe_allow_html=True)
+        st.markdown(f"<a href='{wa_link}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #25D366; color: white; border: none; padding: 10px; cursor: pointer; font-size: 14px; font-weight: bold; color: white; margin-bottom: 20px;'>💬 Send samlet bud (WA)</button></a>", unsafe_allow_html=True)
+        
+        if st.button("🗑️ Ryd pakken", use_container_width=True):
+            st.session_state['cart'] = {}
+            st.rerun()
+
 st.title("⚡ Maul Biler - B2B Elbiler")
 st.write("Velkommen til vores danske B2B portal. Her finder du vores aktuelle elbiler klar til handel.")
 
@@ -32,7 +73,6 @@ def load_b2b_data():
 @st.dialog("📸 Se billeder & detaljer", width="large")
 def show_car_details(row):
     
-    # Status Mærkat i Pop-up (Tjekker både "Status DK" og "Status.1")
     status_dk = str(row.get('Status DK', row.get('Status.1', row.get('Status', '')))).strip()
     if status_dk and status_dk != 'nan' and status_dk != 'Aktiv':
         if "vej" in status_dk.lower():
@@ -47,11 +87,10 @@ def show_car_details(row):
     aarstal = str(row.get('Årgang', '-'))[:4]
     km_str = str(row.get('Odometer', '-'))
     
-    # Henter Pris DKK - FIXET FEJLEN MED DET EKSTRA NUL!
     try: 
         p_str = str(row.get('Pris DKK', '0')).strip()
-        if p_str.endswith('.0'): p_str = p_str[:-2] # Fjerner .0 hvis pandas har tilføjet det
-        p_clean = "".join(filter(str.isdigit, p_str)) # Beholder kun rene tal
+        if p_str.endswith('.0'): p_str = p_str[:-2] 
+        p_clean = "".join(filter(str.isdigit, p_str)) 
         pris_int = int(p_clean) if p_clean else 0
     except: 
         pris_int = 0
@@ -78,7 +117,7 @@ def show_car_details(row):
         else:
             st.info("Ingen billeder tilgængelige endnu.")
             
-    with tab2: # TEKNISK DATA (DANSK)
+    with tab2: 
         c1, c2 = st.columns(2)
         c1.write(f"**Mærke:** {row.get('Mærke', '-')}")
         c1.write(f"**Model:** {row.get('Model', '-')}")
@@ -104,24 +143,19 @@ def show_car_details(row):
         
     st.write("---")
     
-    # KNAPPER I POP-UP (DANSK)
     vin = str(row.get('Stelnummer', 'Ukendt'))
     mærke_model = f"{row.get('Mærke', '')} {row.get('Model', '')}"
-    
     modtagere = "matsc@maulbiler.dk,brmau@maulbiler.dk"
     
-    # Mail: KØB
     emne_koeb = urllib.parse.quote(f"Køb af {mærke_model} (VIN: {vin})")
     tekst_koeb = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne købe bilen til den annoncerede pris.\n\nStelnummer: {vin}")
     mail_link_koeb = f"mailto:{modtagere}?subject={emne_koeb}&body={tekst_koeb}"
     
-    # Mail: BYD
     emne_byd = urllib.parse.quote(f"Bud på {mærke_model} (VIN: {vin})")
     tekst_byd = urllib.parse.quote(f"Hej Mathias og Brian,\n\nJeg vil gerne give et bud på bilen.\n\nMit bud er: [Indtast dit bud her] kr.\n\nStelnummer: {vin}")
     mail_link_byd = f"mailto:{modtagere}?subject={emne_byd}&body={tekst_byd}"
     
     btn_col1, btn_col2 = st.columns(2)
-    
     btn_col1.markdown(f"<a href='{mail_link_koeb}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 12px; cursor: pointer; font-size: 16px; font-weight: bold;'>🛒 Køb</button></a>", unsafe_allow_html=True)
     btn_col2.markdown(f"<a href='{mail_link_byd}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #555555; color: white; border: none; padding: 12px; cursor: pointer; font-size: 16px; font-weight: bold;'>⚖️ Byd</button></a>", unsafe_allow_html=True)
 
@@ -130,25 +164,21 @@ df_b2b = load_b2b_data()
 
 if df_b2b is not None and not df_b2b.empty:
     
-    # 1. VIS KUN AKTIVE BILER
-    status_cols = [c for c in df_b2b.columns if 'Status' in c]
+    status_cols = [c for c in df_b2b.columns if 'Status' in c and c not in ['Moms status', 'Afgift status', 'Status DK']]
     if status_cols:
         active_col = status_cols[-1] 
         df_b2b = df_b2b[df_b2b[active_col].astype(str).str.strip().str.lower() == 'aktiv']
     
-    # 2. VIS KUN ELBILER
     if 'Drivmiddel' in df_b2b.columns:
         df_b2b = df_b2b[df_b2b['Drivmiddel'].astype(str).str.strip().str.lower().isin(['elektrisk', 'el', 'elbil', 'elbiler'])]
     
     if df_b2b.empty:
         st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
     else:
-        # FORBERED DATA TIL SORTERING - FIXET FEJLEN MED DET EKSTRA NUL!
         df_b2b['Sort_Price'] = pd.to_numeric(df_b2b['Pris DKK'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(0)
         df_b2b['Sort_Year'] = pd.to_numeric(df_b2b['Årgang'].astype(str).str[:4], errors='coerce').fillna(0)
         df_b2b['Sort_Km'] = pd.to_numeric(df_b2b['Odometer'].astype(str).str.replace(r'[^\d]', '', regex=True), errors='coerce').fillna(9999999)
 
-        # TOP MENU
         c_search, c_moms, c_afgift, c_sort = st.columns(4)
         
         search_q = c_search.text_input("🔍 Søg mærke/model")
@@ -180,7 +210,6 @@ if df_b2b is not None and not df_b2b.empty:
 
         st.write("---")
         
-        # GRID OPSÆTNING
         cols_per_row = 3
         for i in range(0, len(df_b2b), cols_per_row):
             cols = st.columns(cols_per_row)
@@ -190,7 +219,6 @@ if df_b2b is not None and not df_b2b.empty:
                 with col:
                     with st.container(border=True):
                         
-                        # --- STATUS MÆRKAT I TOPPEN AF KORTET ---
                         status_dk = str(row.get('Status DK', row.get('Status.1', row.get('Status', '')))).strip()
                         if status_dk and status_dk != 'nan' and status_dk != 'Aktiv':
                             if "vej" in status_dk.lower():
@@ -198,7 +226,6 @@ if df_b2b is not None and not df_b2b.empty:
                             else:
                                 st.markdown(f"<div style='background-color:#d4edda; color:#155724; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:bold; width: fit-content; margin-bottom: 5px;'>🟢 {status_dk}</div>", unsafe_allow_html=True)
                         
-                        # Billede
                         img_string = str(row.get('Billede URL', ''))
                         first_img = img_string.split(',')[0].strip() if img_string and img_string != 'nan' else ''
                         if pd.notna(first_img) and first_img.startswith('http'): 
@@ -218,18 +245,17 @@ if df_b2b is not None and not df_b2b.empty:
                         st.markdown(f"📅 **{aarstal}** &nbsp; | &nbsp; 🛣️ **{km_str}** <br> 🕹️ **{gear}** &nbsp; | &nbsp; ⚡ **{fuel}**", unsafe_allow_html=True)
                         st.markdown(f"🏷️ {row.get('Moms status', '-')} &nbsp; | &nbsp; ⚖️ {row.get('Afgift status', '-')}")
                         
-                        # VISER DKK PRIS MED RETTET LAYOUT
                         pris_int = row.get('Sort_Price', 0)
                         st.write("---")
+                        pris_display = f"kr. {int(pris_int):,}".replace(',', '.') if pris_int > 0 else "Giv et bud"
                         if pris_int > 0: 
-                            st.markdown(f"<h2 style='text-align: center; color: #2e7b32; font-weight: bold;'>kr. {int(pris_int):,}</h2>".replace(',', '.'), unsafe_allow_html=True)
+                            st.markdown(f"<h2 style='text-align: center; color: #2e7b32; font-weight: bold;'>{pris_display}</h2>", unsafe_allow_html=True)
                         else: 
-                            st.markdown(f"<h2 style='text-align: center;'>Giv et bud</h2>", unsafe_allow_html=True)
+                            st.markdown(f"<h2 style='text-align: center;'>{pris_display}</h2>", unsafe_allow_html=True)
                         
                         if st.button("📸 Se detaljer & billeder", key=f"view_{row.name}", use_container_width=True): 
                             show_car_details(row)
                         
-                        # KNAPPER PÅ KORTET (KØB & BYD)
                         vin = str(row.get('Stelnummer', 'Ukendt'))
                         mærke_model = f"{row.get('Mærke', '')} {row.get('Model', '')}"
                         modtagere = "matsc@maulbiler.dk,brmau@maulbiler.dk"
@@ -245,6 +271,23 @@ if df_b2b is not None and not df_b2b.empty:
                         c_btn1, c_btn2 = st.columns(2)
                         c_btn1.markdown(f"<a href='{mail_link_koeb}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #2e7b32; color: white; border: none; padding: 6px; cursor: pointer; font-size: 14px; font-weight: bold;'>🛒 Køb</button></a>", unsafe_allow_html=True)
                         c_btn2.markdown(f"<a href='{mail_link_byd}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #555555; color: white; border: none; padding: 6px; cursor: pointer; font-size: 14px; font-weight: bold;'>⚖️ Byd</button></a>", unsafe_allow_html=True)
+                        
+                        # --- PAKKE TILFØJ/FJERN KNAP ---
+                        st.write("")
+                        vin_key = vin if vin != 'Ukendt' else str(row.name)
+                        if vin_key in st.session_state['cart']:
+                            if st.button("➖ Fjern fra pakke", key=f"rm_{row.name}", use_container_width=True):
+                                del st.session_state['cart'][vin_key]
+                                st.rerun()
+                        else:
+                            if st.button("➕ Tilføj til pakke", key=f"add_{row.name}", use_container_width=True):
+                                st.session_state['cart'][vin_key] = {
+                                    'title': mærke_model,
+                                    'price_int': pris_int,
+                                    'price_str': pris_display,
+                                    'vin': vin
+                                }
+                                st.rerun()
 
 else:
     st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
