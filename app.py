@@ -40,10 +40,7 @@ with st.sidebar:
         for key, car in st.session_state['cart'].items():
             total_list_price += car['price_int']
             
-            # Hent nuværende bud (eller listepris som standard)
             current_bid = car.get('bid_price', car['price_int'])
-            
-            # Input-felt til forhandlerens eget bud
             listepris_str = f"kr. {car['price_int']:,}".replace(',', '.')
             new_bid = st.number_input(
                 f"{car['title']} (Listepris: {listepris_str})",
@@ -53,11 +50,9 @@ with st.sidebar:
                 key=f"bid_{key}"
             )
             
-            # Opdater kurven med det nye bud
             st.session_state['cart'][key]['bid_price'] = new_bid
             total_bid_price += new_bid
             
-            # Formater bud til teksten
             bid_str = f"kr. {new_bid:,}".replace(',', '.')
             cart_text_lines.append(f"- {car['title']} (VIN: {car['vin']}) -> Mit bud: {bid_str}")
             
@@ -127,7 +122,18 @@ def show_car_details(row):
     
     st.write("---")
     
-    tab1, tab2 = st.tabs(["📸 Billeder", "⚙️ Teknisk Data"])
+    # Henter de nye data for at se om Fane 3 skal vises
+    pdf_url = str(row.get('Udstyrsliste PDF', '')).strip()
+    skade_string = str(row.get('Skadesbilleder URL', '')).strip()
+    
+    has_pdf = bool(pdf_url and pdf_url != 'nan')
+    has_skader = bool(skade_string and skade_string != 'nan')
+    
+    # Dynamisk fane-opbygning
+    if has_pdf or has_skader:
+        tab1, tab2, tab3 = st.tabs(["📸 Billeder", "⚙️ Teknisk Data", "⚠️ Skader & Udstyr"])
+    else:
+        tab1, tab2 = st.tabs(["📸 Billeder", "⚙️ Teknisk Data"])
     
     with tab1:
         img_string = str(row.get('Billede URL', ''))
@@ -163,6 +169,22 @@ def show_car_details(row):
         st.write("---")
         st.write("**Udstyr & Bemærkninger:**")
         st.info(row.get('Udstyr/Bemærkninger', 'Ingen bemærkninger.'))
+
+    # --- DEN NYE FANE (Bliver kun vist hvis der er indhold) ---
+    if has_pdf or has_skader:
+        with tab3:
+            if has_pdf:
+                st.subheader("📄 Udstyrsliste")
+                st.markdown(f"<a href='{pdf_url}' target='_blank'><button style='width: 100%; border-radius: 5px; background-color: #3b82f6; color: white; border: none; padding: 10px; cursor: pointer; font-size: 15px; font-weight: bold; margin-bottom: 20px;'>Åbn Udstyrsliste (PDF)</button></a>", unsafe_allow_html=True)
+            
+            if has_skader:
+                st.subheader("⚠️ Noterede Skader")
+                st.info("Billeder herunder viser de specifikke kosmetiske skader, der er noteret på bilen.")
+                skade_images = [url.strip() for url in skade_string.split(',')]
+                for img in skade_images:
+                    if img.startswith('http'):
+                        st.image(img, use_container_width=True)
+                        st.write("---")
         
     st.write("---")
     
@@ -306,12 +328,13 @@ if df_b2b is not None and not df_b2b.empty:
                             if st.button("➕ Tilføj til pakke", key=f"add_{row.name}", use_container_width=True):
                                 st.session_state['cart'][vin_key] = {
                                     'title': mærke_model,
-                                    'price_int': int(pris_int), # Sikrer at den er integer til udregning
+                                    'price_int': int(pris_int), 
                                     'price_str': pris_display,
                                     'vin': vin,
-                                    'bid_price': int(pris_int) # Standardbuddet er listeprisen
+                                    'bid_price': int(pris_int) 
                                 }
                                 st.rerun()
 
 else:
+    st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
     st.info("Der er i øjeblikket ingen aktive elbiler til salg på portalen.")
